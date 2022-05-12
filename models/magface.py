@@ -1,17 +1,17 @@
 #!/usr/bin/env python
+import os
+import torch.nn as nn
+import torch
+import math
+import numpy as np
+import torch.backends.cudnn as cudnn
+import torch.nn.functional as F
+from torch.nn import Parameter
+from termcolor import cprint
+from collections import OrderedDict
+from models import iresnet
 import sys
 sys.path.append("..")
-from models import iresnet
-from collections import OrderedDict
-from termcolor import cprint
-from torch.nn import Parameter
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
-import numpy as np
-import math
-import torch
-import torch.nn as nn
-import os
 
 
 def builder(args):
@@ -55,15 +55,21 @@ class SoftmaxBuilder(nn.Module):
         self.u_a = args.u_a
 
     def _margin(self, x):
-        """generate adaptive margin
         """
-        margin = (self.u_margin-self.l_margin) / \
-            (self.u_a-self.l_a)*(x-self.l_a) + self.l_margin
+        generate adaptive margin
+
+        """
+        margin = (self.u_margin-self.l_margin) / (self.u_a-self.l_a)*(x-self.l_a) + self.l_margin
+        
         return margin
 
     def forward(self, x, target):
+        # This part is resnet part we get a vector length of 512
+        
         x = self.features(x)
+        
         logits, x_norm = self.fc(x, self._margin, self.l_a, self.u_a)
+
         return logits, x_norm
 
 
@@ -82,26 +88,29 @@ class MagLinear(torch.nn.Module):
         self.easy_margin = easy_margin
 
     def forward(self, x, m, l_a, u_a):
-        """
-        Here m is a function which generate adaptive margin
-        """
+
+        # Here we notmalize features extracted from the model
         x_norm = torch.norm(x, dim=1, keepdim=True).clamp(l_a, u_a)
+
+        # Here m is a function which generate adaptive margin
         ada_margin = m(x_norm)
+
         cos_m, sin_m = torch.cos(ada_margin), torch.sin(ada_margin)
 
         # norm the weight
         weight_norm = F.normalize(self.weight, dim=0)
+
         cos_theta = torch.mm(F.normalize(x), weight_norm)
         cos_theta = cos_theta.clamp(-1, 1)
         sin_theta = torch.sqrt(1.0 - torch.pow(cos_theta, 2))
         cos_theta_m = cos_theta * cos_m - sin_theta * sin_m
+
         if self.easy_margin:
             cos_theta_m = torch.where(cos_theta > 0, cos_theta_m, cos_theta)
         else:
             mm = torch.sin(math.pi - ada_margin) * ada_margin
             threshold = torch.cos(math.pi - ada_margin)
-            cos_theta_m = torch.where(
-                cos_theta > threshold, cos_theta_m, cos_theta - mm)
+            cos_theta_m = torch.where(cos_theta > threshold, cos_theta_m, cos_theta - mm)
         # multiply the scale in advance
         cos_theta_m = self.scale * cos_theta_m
         cos_theta = self.scale * cos_theta

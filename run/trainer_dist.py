@@ -4,7 +4,7 @@ sys.path.append("..")
 from dataloader import dataloader_dist
 from models import magface_dist
 
-from utils import utils
+from util import util
 from torch.cuda.amp import autocast
 from torch.cuda.amp import GradScaler
 import numpy as np

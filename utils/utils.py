@@ -2,6 +2,7 @@
     This file contains utility functions that are not used in the core library,
     but are useful for building models or training code using the config system.
 """
+from csv import writer
 import logging
 import os
 import sys
@@ -17,7 +18,16 @@ from termcolor import cprint
 from loguru import logger
 
 
+def append_list_as_row(file_name, list_of_elem):
+    # Open file in append mode
+    with open(file_name, "a+", newline="") as write_obj:
+        # Create a writer object from csv module
+        csv_writer = writer(write_obj)
+        # Add contents of list as last row in the csv file
+        csv_writer.writerow(list_of_elem)
 # classes
+
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -135,7 +145,8 @@ def accuracy(args, output, target, topk=(1,)):
 
         res = []
         for k in topk:
-            correct_k = correct[:k].contiguous().view(-1).float().sum(0, keepdim=True)
+            correct_k = correct[:k].contiguous(
+            ).view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import os
+from termcolor import cprint
+from tqdm import tqdm
+from collections import OrderedDict
+from models import iresnet
 import sys
 sys.path.append("..")
-from models import iresnet
-from collections import OrderedDict
-from tqdm import tqdm
-from termcolor import cprint
-import os
-import torch.nn.functional as F
-import torch.nn as nn
-import torch
 
 
 def load_features(args):
@@ -52,9 +52,12 @@ def load_dict_inf(args, model):
     if os.path.isfile(args.resume):
         cprint('=> loading pth from {} ...'.format(args.resume))
         if args.cpu_mode:
-            checkpoint = torch.load(args.resume, map_location=torch.device("cpu"))
+            checkpoint = torch.load(
+                args.resume, map_location=torch.device("cpu"))
         else:
             checkpoint = torch.load(args.resume)
+
+        # checkpoint['state_dict']
         _state_dict = clean_dict_inf(model, checkpoint['state_dict'])
         model_dict = model.state_dict()
         model_dict.update(_state_dict)
@@ -71,15 +74,16 @@ def clean_dict_inf(model, state_dict):
     _state_dict = OrderedDict()
     for k, v in state_dict.items():
         # # assert k[0:1] == 'features.module.'
-        new_k = 'features.'+'.'.join(k.split('.')[2:])
+        new_k = k  # 'features.'+'.'.join(k.split('.')[2:])
         if new_k in model.state_dict().keys() and \
            v.size() == model.state_dict()[new_k].size():
             _state_dict[new_k] = v
         # assert k[0:1] == 'module.features.'
-        new_kk = '.'.join(k.split('.')[1:])
+        new_kk = k  # '.'.join(k.split('.')[1:])
         if new_kk in model.state_dict().keys() and \
            v.size() == model.state_dict()[new_kk].size():
             _state_dict[new_kk] = v
+
     num_model = len(model.state_dict().keys())
     num_ckpt = len(_state_dict.keys())
     if num_model != num_ckpt:
@@ -90,6 +94,5 @@ def clean_dict_inf(model, state_dict):
 
 def builder_inf(args):
     model = NetworkBuilder_inf(args)
-    # Used to run inference
     model = load_dict_inf(args, model)
     return model

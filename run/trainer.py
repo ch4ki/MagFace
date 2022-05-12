@@ -1,26 +1,28 @@
 #!/usr/bin/env python
-import sys
-sys.path.append("..")
-from dataloader import dataloader
-from models import magface
-from utils import utils
-import numpy as np
-from collections import OrderedDict
-from termcolor import cprint
-from torchvision import datasets
-from torchvision import transforms
-import torch.backends.cudnn as cudnn
-import torch.multiprocessing as mp
-import torch.nn.functional as F
-import torch.nn as nn
-import torchvision
-import torch
-import argparse
-import random
-import warnings
-import time
-import pprint
 import os
+import pprint
+import time
+import warnings
+import random
+import argparse
+import torch
+import torchvision
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.multiprocessing as mp
+import torch.backends.cudnn as cudnn
+from torchvision import transforms
+from torchvision import datasets
+from termcolor import cprint
+from collections import OrderedDict
+import numpy as np
+from utils import utils
+from models import magface
+from dataloader import dataloader
+import sys
+
+sys.path.append("..")
+sys.path.append("./")
 
 
 warnings.filterwarnings("ignore")
@@ -29,24 +31,24 @@ warnings.filterwarnings("ignore")
 # parse the args
 cprint('=> parse the args ...', 'green')
 parser = argparse.ArgumentParser(description='Trainer for Magface')
-parser.add_argument('--arch', default='resnet100', type=str,
+parser.add_argument('--arch', default='iresnet50', type=str,
                     help='backbone architechture')
-parser.add_argument('--train_list', default='', type=str,
-                    help='')
+parser.add_argument(
+    '--train_list', default='eval/eval_recognition/data/CleanData/ijba.list', type=str, help='')
 
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
+parser.add_argument('-j', '--workers', default=1, type=int,
+                    metavar='N', help='number of data loading workers (default: 4)')
+parser.add_argument('--epochs', default=25, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=512, type=int, metavar='N',
+parser.add_argument('-b', '--batch-size', default=32, type=int, metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                     'batch size of all GPUs on the current node when '
                     'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--embedding-size', default=512, type=int,
-                    help='The embedding feature size')
-parser.add_argument('--last-fc-size', default=1000, type=int,
+parser.add_argument('--embedding-size', default=512,
+                    type=int, help='The embedding feature size')
+parser.add_argument('--last-fc-size', default=85742, type=int,
                     help='The num of last fc layers for using softmax')
 
 
@@ -111,7 +113,8 @@ def main_worker(ngpus_per_node, args):
 
     cprint('=> modeling the network ...', 'green')
     model = magface.builder(args)
-    model = torch.nn.DataParallel(model).cuda()
+    model = model.cuda()
+    # model = torch.nn.DataParallel(model).cuda()
     # for name, param in model.named_parameters():
     #     cprint(' : layer name and parameter size - {} - {}'.format(name, param.size()), 'green')
 
@@ -171,7 +174,7 @@ def do_train(train_loader, model, criterion, optimizer, epoch, args):
     losses_id = utils.AverageMeter('L_ID', ':.3f')
     losses_mag = utils.AverageMeter('L_mag', ':.6f')
     progress_template = [batch_time, data_time, throughputs, 'images/s',
-                         losses, losses_id, losses_mag, 
+                         losses, losses_id, losses_mag,
                          top1, top5, learning_rate]
 
     progress = utils.ProgressMeter(
@@ -189,8 +192,8 @@ def do_train(train_loader, model, criterion, optimizer, epoch, args):
         global iters
         iters += 1
 
-        input = input.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True)
+        input = input.cuda()
+        target = target.cuda()
 
         # compute output
         output, x_norm = model(input, target)
@@ -222,7 +225,7 @@ def do_train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
             debug_info(x_norm, args.l_a, args.u_a,
-                           args.l_margin, args.u_margin)
+                       args.l_margin, args.u_margin)
 
         if args.vis_mag:
             if (i > 10000) and (i % 100 == 0):

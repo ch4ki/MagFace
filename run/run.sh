@@ -16,7 +16,7 @@ mkdir -p ${OUTPUT}/vis/
 
 python -u trainer.py \
     --arch ${MODEL_ARC} \
-    --train_list /training/face-group/opensource/ms1m-112/ms1m_train.list \
+    --train_list /home/nigar/MagFace/eval/eval_recognition/data/CleanData/ijba.list \
     --workers 8 \
     --epochs 25 \
     --start-epoch 0 \

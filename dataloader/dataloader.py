@@ -27,7 +27,7 @@ class MagTrainDataset(data.Dataset):
         self.pre_types = []
         with open(self.ann_file) as f:
             for line in f.readlines():
-                data = line.strip().split(' ')
+                data = line.strip().split(',')
                 self.im_names.append(data[0])
                 self.targets.append(int(data[2]))
 
@@ -45,6 +45,7 @@ class MagTrainDataset(data.Dataset):
 
 def train_loader(args):
     train_trans = transforms.Compose([
+        transforms.Resize((112, 112)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
     ])

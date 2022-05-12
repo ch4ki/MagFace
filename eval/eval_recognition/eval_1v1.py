@@ -13,9 +13,9 @@ from scipy import interpolate
 
 # basic args
 parser = argparse.ArgumentParser(description='Evaluation')
-parser.add_argument('--feat-list', type=str,
+parser.add_argument('--feat-list', type=str, default="/home/nigar/MagFace/eval/eval_recognition/features/magface_iresnet100/lfw_official.list",
                     help='The cache folder for validation report')
-parser.add_argument('--pair-list', type=str,
+parser.add_argument('--pair-list', type=str, default="data/lfw/pair.list",
                     help='whether the img in feature list is same person')
 parser.add_argument('--eval-type', type=str,
                     default='1v1',

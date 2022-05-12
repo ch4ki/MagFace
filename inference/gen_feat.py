@@ -28,9 +28,9 @@ cprint('=> parse the args ...', 'green')
 parser = argparse.ArgumentParser(description='Trainer for posenet')
 parser.add_argument('--arch', default='iresnet100', type=str,
                     help='backbone architechture')
-parser.add_argument('--inf_list', default='', type=str,
+parser.add_argument('--inf_list', default='../eval_recognition/data/lfw/img.list', type=str,
                     help='the inference list')
-parser.add_argument('--feat_list', type=str,
+parser.add_argument('--feat_list', type=str, default="./features/magface_iresnet/lfw_official.list",
                     help='The save path for saveing features')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
@@ -40,7 +40,7 @@ parser.add_argument('-b', '--batch_size', default=256, type=int, metavar='N',
                     'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--embedding_size', default=512, type=int,
                     help='The embedding feature size')
-parser.add_argument('--resume', default=None, type=str, metavar='PATH',
+parser.add_argument('--resume', default="/home/nigar/MagFace/magface_epoch_00025.pth", type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-p', '--print-freq', default=100, type=int,
                     metavar='N', help='print frequency (default: 10)')
