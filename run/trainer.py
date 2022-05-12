@@ -19,8 +19,9 @@ import numpy as np
 from utils import utils
 from models import magface
 from dataloader import dataloader
+import logging
 import sys
-
+import wandb
 sys.path.append("..")
 sys.path.append("./")
 
@@ -92,16 +93,38 @@ parser.add_argument('--vis_mag', default=1, type=int,
 args = parser.parse_args()
 
 
+wandb.login()
+wandb.init(project="new-face_recognition-sota-model")
+log = logging.getLogger(__name__)
+
+
 def main(args):
+    wandb.config = {
+        "arch": args.arch,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "embedding-size": args.embedding_size,
+        "last-fc-size": args.last_fc_size,
+        "learning-rate": args.lr,
+        "momentum": args.momentum,
+        "weight-decay": args.weight_decay,
+        "lr-drop-epoch": args.lr_drop_epoch,
+        "l_a": args.l_a,
+        "u_a": args.u_a,
+        "l_margin": args.l_margin,
+        "u_margin": args.u_margin,
+
+    }
+
     # check the feasible of the lambda g
     s = 64
     k = (args.u_margin-args.l_margin)/(args.u_a-args.l_a)
     min_lambda = s*k*args.u_a**2*args.l_a**2/(args.u_a**2-args.l_a**2)
-    color_lambda = 'red' if args.lambda_g < min_lambda else 'green'
-    cprint('min lambda g is {}, currrent lambda is {}'.format(
-        min_lambda, args.lambda_g), color_lambda)
 
-    cprint('=> torch version : {}'.format(torch.__version__), 'green')
+    color_lambda = 'red' if args.lambda_g < min_lambda else 'green'
+    log.info('min lambda g is {}, currrent lambda is {}'.format(
+        min_lambda, args.lambda_g), color_lambda)
+    log.info('=> torch version : {}'.format(torch.__version__))
     ngpus_per_node = torch.cuda.device_count()
     cprint('=> ngpus : {}'.format(ngpus_per_node), 'green')
 
