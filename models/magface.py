@@ -14,8 +14,8 @@ import sys
 sys.path.append("..")
 
 
-def builder(args):
-    model = SoftmaxBuilder(args)
+def builder(config):
+    model = SoftmaxBuilder(config)
     return model
 
 
@@ -42,23 +42,25 @@ def load_features(args):
 
 
 class SoftmaxBuilder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, config):
         super(SoftmaxBuilder, self).__init__()
-        self.features = load_features(args)
-        self.fc = MagLinear(args.embedding_size,
-                            args.last_fc_size,
-                            scale=args.arc_scale)
+        self.features = load_features(config)
+        self.fc = MagLinear(config.embedding_size,
+                            config.last_fc_size,
+                            scale=config.arc_scale)
 
-        self.l_margin = args.l_margin
-        self.u_margin = args.u_margin
-        self.l_a = args.l_a
-        self.u_a = args.u_a
+        self.l_margin = config.l_margin
+        self.u_margin = config.u_margin
+        self.l_a = config.l_a
+        self.u_a = config.u_a
 
     def _margin(self, x):
         """
         generate adaptive margin
 
         """
+        
+        # Formula 9 on the paper
         margin = (self.u_margin-self.l_margin) / (self.u_a-self.l_a)*(x-self.l_a) + self.l_margin
         
         return margin
@@ -122,7 +124,6 @@ class MagLoss(torch.nn.Module):
     """
     MagFace Loss.
     """
-
     def __init__(self, l_a, u_a, l_margin, u_margin, scale=64.0):
         super(MagLoss, self).__init__()
         self.l_a = l_a
@@ -130,9 +131,9 @@ class MagLoss(torch.nn.Module):
         self.scale = scale
         self.cut_off = np.cos(np.pi/2-l_margin)
         self.large_value = 1 << 10
-
+        
     def calc_loss_G(self, x_norm):
-        g = 1/(self.u_a**2) * x_norm + 1/(x_norm)
+        g = 1 / (self.u_a**2)*x_norm + 1 / (x_norm)
         return torch.mean(g)
 
     def forward(self, input, target, x_norm):
