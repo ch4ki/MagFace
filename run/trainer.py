@@ -23,6 +23,7 @@ import sys
 
 sys.path.append("..")
 sys.path.append("./")
+import face_recognition
 
 
 warnings.filterwarnings("ignore")
@@ -42,7 +43,7 @@ parser.add_argument('--epochs', default=25, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=32, type=int, metavar='N',
+parser.add_argument('-b', '--batch-size', default=2, type=int, metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                     'batch size of all GPUs on the current node when '
                     'using Data Parallel or Distributed Data Parallel')
@@ -130,8 +131,7 @@ def main_worker(ngpus_per_node, args):
     train_loader = dataloader.train_loader(args)
 
     cprint('=> building the criterion ...', 'green')
-    criterion = magface.MagLoss(
-        args.l_a, args.u_a, args.l_margin, args.u_margin)
+    criterion = magface.MagLoss(args.l_a, args.u_a, args.l_margin, args.u_margin)
 
     global iters
     iters = 0

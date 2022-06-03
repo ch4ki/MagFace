@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import dlib
 from mimetypes import init
 import os
 import pprint
@@ -28,8 +29,12 @@ import sys
 sys.path.append("..")
 sys.path.append("../../")
 
-
 # parse the args
+composer = transforms.Compose([
+    transforms.Resize((112, 112)),
+    transforms.ToTensor(),
+    #transforms.Normalize(mean=[0., 0., 0.], std=[1., 1., 1.]),
+])
 
 
 class ImgInfLoader(data.Dataset):
@@ -70,6 +75,11 @@ class ImgInfLoader(data.Dataset):
         return len(self.imgs)
 
 
+detector = dlib.get_frontal_face_detector()
+sp = dlib.shape_predictor(
+    "/home/chaki/Projects/dlib_face_recognition/shape_predictor_5_face_landmarks.dat")
+
+
 class Magface:
 
     def __init__(self) -> None:
@@ -103,6 +113,7 @@ def process_faces(path: str):
     columns = ["id", "path", "feature_512"]
     fold = Path("db_files/") / "data_not_normalized.csv"
     utils.append_list_as_row(fold, columns)
+    dirs.append(path)
     for directory in dirs:
         id = directory.split("/")[-1]
 
@@ -127,9 +138,24 @@ def process_faces(path: str):
             for i, (input, img_paths) in enumerate(inf_loader):
                 # measure data loading time
                 data_time.update(time.time() - end)
-                image = input[0].cuda()
+
+                img1 = dlib.load_rgb_image(img_paths[0])
+                img1_detection = detector(img1, 1)
+                if len(img1_detection) == 0:
+                    print("No face found, passing")
+                    continue
+                img1_shape = sp(img1, img1_detection[0])
+                img1_aligned = dlib.get_face_chip(img1, img1_shape)
+
+                cv2.imwrite(img_paths[0], img1_aligned)
                 # compute output
-                embedding_feat = magFace.model(image)
+                img1_aligned = cv2.cvtColor(img1_aligned, cv2.COLOR_BGR2RGB)
+                img1_aligned = PIL.Image.fromarray(img1_aligned)
+
+                img1_aligned = composer(img1_aligned)
+                img1_aligned = img1_aligned.unsqueeze(dim=0).cuda()
+
+                embedding_feat = magFace.model(img1_aligned)
                 # embedding_feat = F.normalize(embedding_feat, p=2, dim=1)
 
                 _feat = embedding_feat.data.cpu().numpy()
@@ -149,6 +175,6 @@ def process_faces(path: str):
 
 if __name__ == '__main__':
     cprint('=> parse the args ...', 'green')
-    path = "/home/chaki/Projects/gods_eye/output/ptz_good_test_2/"
+    path = "/home/chaki/Projects/MagFace/images/12_people_min_samples/person_12"
     preprocess_faces(path)
     process_faces(path)
