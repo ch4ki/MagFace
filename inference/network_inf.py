@@ -74,12 +74,12 @@ def clean_dict_inf(model, state_dict):
     _state_dict = OrderedDict()
     for k, v in state_dict.items():
         # # assert k[0:1] == 'features.module.'
-        new_k = k  # 'features.'+'.'.join(k.split('.')[2:])
+        new_k = 'features.'+'.'.join(k.split('.')[2:])
         if new_k in model.state_dict().keys() and \
            v.size() == model.state_dict()[new_k].size():
             _state_dict[new_k] = v
         # assert k[0:1] == 'module.features.'
-        new_kk = k  # '.'.join(k.split('.')[1:])
+        new_kk = '.'.join(k.split('.')[1:])
         if new_kk in model.state_dict().keys() and \
            v.size() == model.state_dict()[new_kk].size():
             _state_dict[new_kk] = v
