@@ -19,8 +19,9 @@ import numpy as np
 from utils import utils
 from models import magface
 from dataloader import dataloader
+import logging
 import sys
-
+import wandb
 sys.path.append("..")
 sys.path.append("./")
 import face_recognition
@@ -60,18 +61,18 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
-parser.add_argument('--lr-drop-epoch', default=[30, 60, 90], type=int, nargs='+',
-                    help='The learning rate drop epoch')
-parser.add_argument('--lr-drop-ratio', default=0.1, type=float,
-                    help='The learning rate drop ratio')
+parser.add_argument('--lr-drop-epoch', default=[30, 60, 90],
+                    type=int, nargs='+', help='The learning rate drop epoch')
+parser.add_argument('--lr-drop-ratio', default=0.1,
+                    type=float, help='The learning rate drop ratio')
 
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 
-parser.add_argument('--pth-save-fold', default='tmp', type=str,
-                    help='The folder to save pths')
-parser.add_argument('--pth-save-epoch', default=1, type=int,
-                    help='The epoch to save pth')
+parser.add_argument('--pth-save-fold', default='tmp',
+                    type=str, help='The folder to save pths')
+parser.add_argument('--pth-save-epoch', default=1,
+                    type=int, help='The epoch to save pth')
 
 
 # magface parameters
@@ -93,38 +94,97 @@ parser.add_argument('--vis_mag', default=1, type=int,
 args = parser.parse_args()
 
 
+wandb.login()
+wandb.init(project="new-face_recognition-sota-model")
+log = logging.getLogger(__name__)
+
+
 def main(args):
+    wandb.config = args
     # check the feasible of the lambda g
     s = 64
     k = (args.u_margin-args.l_margin)/(args.u_a-args.l_a)
     min_lambda = s*k*args.u_a**2*args.l_a**2/(args.u_a**2-args.l_a**2)
-    color_lambda = 'red' if args.lambda_g < min_lambda else 'green'
-    cprint('min lambda g is {}, currrent lambda is {}'.format(
-        min_lambda, args.lambda_g), color_lambda)
 
-    cprint('=> torch version : {}'.format(torch.__version__), 'green')
+    color_lambda = 'red' if args.lambda_g < min_lambda else 'green'
+    log.info('min lambda g is {}, currrent lambda is {}'.format(
+        min_lambda, args.lambda_g), color_lambda)
+    log.info('=> torch version : {}'.format(torch.__version__))
     ngpus_per_node = torch.cuda.device_count()
     cprint('=> ngpus : {}'.format(ngpus_per_node), 'green')
 
     main_worker(ngpus_per_node, args)
 
 
+def make_loader(dataset, batch_size):
+    loader = dataloader.train_loader(args)
+
+    return loader
+
+
+def get_data(slice=5, train=True):
+
+    full_dataset = torchvision.datasets.MNIST(root=".",
+                                              train=train,
+                                              transform=transforms.ToTensor(),
+                                              download=True)
+    sub_dataset = torch.utils.data.Subset(
+        full_dataset, indices=range(0, len(full_dataset), slice))
+
+    return sub_dataset
+
+
+def make(config):
+    config = wandb.config
+    model = magface.builder(config)
+    # ! Burani ishlemek lazimdi
+    train, test = get_data(train=True), get_data(train=False)
+    train_loader = make_loader(train, batch_size=config.batch_size)
+    test_loader = make_loader(test, batch_size=config.batch_size)
+
+    # Make the model
+    model = magface.builder(config)
+    model = model.cuda()
+
+    # Make the loss and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=config.learning_rate)
+
+    return model, train_loader, test_loader, criterion, optimizer
+
+
+def model_pipeline(hyperparams):
+
+    with wandb.init(project="pytorch-demo", config=hyperparams):
+
+        config = wandb.config
+        model, train_loader, test_loader, criterion, optimizer = make(
+            args, config)
+
+        print(model)
+
+        # and use them to train the model
+        train(model, train_loader, criterion, optimizer, config)
+
+        # and test its final performance
+        test(model, test_loader)
+
+    return model
+
+
 def main_worker(ngpus_per_node, args):
     global best_acc1
-
+    make(wandb.config)
     cprint('=> modeling the network ...', 'green')
     model = magface.builder(args)
     model = model.cuda()
-    # model = torch.nn.DataParallel(model).cuda()
-    # for name, param in model.named_parameters():
-    #     cprint(' : layer name and parameter size - {} - {}'.format(name, param.size()), 'green')
 
     cprint('=> building the oprimizer ...', 'green')
-    optimizer = torch.optim.SGD(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        args.lr,
-        momentum=args.momentum,
-        weight_decay=args.weight_decay)
+
+    optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
+                                args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
     pprint.pprint(optimizer)
 
     cprint('=> building the dataloader ...', 'green')
@@ -173,14 +233,11 @@ def do_train(train_loader, model, criterion, optimizer, epoch, args):
 
     losses_id = utils.AverageMeter('L_ID', ':.3f')
     losses_mag = utils.AverageMeter('L_mag', ':.6f')
-    progress_template = [batch_time, data_time, throughputs, 'images/s',
-                         losses, losses_id, losses_mag,
-                         top1, top5, learning_rate]
+    
+    progress_template = [batch_time, data_time, throughputs, 'images/s', losses, losses_id, losses_mag, top1, top5, learning_rate]
 
-    progress = utils.ProgressMeter(
-        len(train_loader),
-        progress_template,
-        prefix="Epoch: [{}]".format(epoch))
+    progress = utils.ProgressMeter(len(train_loader), progress_template, prefix="Epoch: [{}]".format(epoch))
+    
     end = time.time()
 
     # update lr
@@ -205,6 +262,7 @@ def do_train(train_loader, model, criterion, optimizer, epoch, args):
         acc1, acc5 = utils.accuracy(args, output[0], target, topk=(1, 5))
 
         losses.update(loss.item(), input.size(0))
+
         top1.update(acc1[0], input.size(0))
         top5.update(acc5[0], input.size(0))
 
