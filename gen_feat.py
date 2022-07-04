@@ -1,35 +1,42 @@
 #!/usr/bin/env python
-import dlib
-from mimetypes import init
+import argparse
 import os
 import pprint
+import sys
 import time
 import warnings
-import PIL
+from csv import writer
+from mimetypes import init
+from pathlib import Path
+
+import cv2
+import dlib
 import numpy as np
-import argparse
 import pandas as pd
+import PIL
 import torch
-import torchvision
-import torch.utils.data.distributed
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn.functional as F
 import torch.utils.data as data
-from torchvision import transforms
-from torchvision import datasets
+import torch.utils.data.distributed
+import torchvision
 from termcolor import cprint
-import cv2
-from csv import writer
-from pathlib import Path
 from torch import nn
+from torchvision import datasets, transforms
 from tqdm import tqdm
+
 from inference.network_inf import builder_inf
 from utils import utils
-import sys
 
 sys.path.append("..")
 sys.path.append("../../")
+
+composer = transforms.Compose([
+    transforms.Resize((112, 112)),
+    transforms.ToTensor(),
+    #transforms.Normalize(mean=[0., 0., 0.], std=[1., 1., 1.]),
+])
 
 
 def preprocess_faces(path):
@@ -142,17 +149,11 @@ def process_faces(path: str, save_path: str):
             end = time.time()
             for i, (input, img_paths) in enumerate(tqdm(inf_loader)):
                 # measure data loading time
+
                 data_time.update(time.time() - end)
+
                 image = input[0].cuda()
-                print(image)
-                # compute output
-                img1_aligned = cv2.cvtColor(img1_aligned, cv2.COLOR_BGR2RGB)
-                img1_aligned = PIL.Image.fromarray(img1_aligned)
-
-                img1_aligned = composer(img1_aligned)
-                img1_aligned = img1_aligned.unsqueeze(dim=0).cuda()
-
-                embedding_feat = magFace.model(img1_aligned)
+                embedding_feat = magFace.model(image)
                 # embedding_feat = F.normalize(embedding_feat, p=2, dim=1)
                 _feat = embedding_feat.data.cpu().numpy()
                 # measure elapsed time
